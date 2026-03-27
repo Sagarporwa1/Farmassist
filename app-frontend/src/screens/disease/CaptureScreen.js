@@ -11,50 +11,93 @@ import * as ImagePicker from 'expo-image-picker';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '../../styles/colors';
 import { commonStyles } from '../../styles/commonStyles';
+import { predictDiseaseFromImage } from '../../services/diseaseInference';
 
 const CaptureScreen = ({ navigation }) => {
     const [imageUri, setImageUri] = useState(null);
+    const [prediction, setPrediction] = useState(null);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-    const requestPermissions = async () => {
+    const runInference = async (uri) => {
+        setIsAnalyzing(true);
+        try {
+            const result = await predictDiseaseFromImage(uri);
+            setPrediction(result);
+        } catch (error) {
+            console.error('Error running inference:', error);
+            setPrediction(null);
+            Alert.alert(
+                'Inference Failed',
+                'Model could not run on this image. Please verify model setup and try another image.'
+            );
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
+    const requestCameraPermission = async () => {
         const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
-        const { status: mediaStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-        if (cameraStatus !== 'granted' || mediaStatus !== 'granted') {
-            Alert.alert('Permission Required', 'Please grant camera and media library permissions');
+        if (cameraStatus !== 'granted') {
+            Alert.alert('Permission Required', 'Please grant camera permission');
             return false;
         }
+
+        return true;
+    };
+
+    const requestMediaPermission = async () => {
+        const { status: mediaStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+        if (mediaStatus !== 'granted') {
+            Alert.alert('Permission Required', 'Please grant media library permission');
+            return false;
+        }
+
         return true;
     };
 
     const handleCamera = async () => {
-        const hasPermission = await requestPermissions();
+        const hasPermission = await requestCameraPermission();
         if (!hasPermission) return;
 
-        const result = await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [4, 3],
-            quality: 0.8,
-        });
+        try {
+            const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ['images'],
+                allowsEditing: false,
+                quality: 0.8,
+            });
 
-        if (!result.canceled) {
-            setImageUri(result.assets[0].uri);
+            if (!result.canceled) {
+                const uri = result.assets[0].uri;
+                setImageUri(uri);
+                runInference(uri);
+            }
+        } catch (error) {
+            console.error('Error opening camera:', error);
+            Alert.alert('Camera Error', 'Unable to open camera. Please try again.');
         }
     };
 
     const handleGallery = async () => {
-        const hasPermission = await requestPermissions();
+        const hasPermission = await requestMediaPermission();
         if (!hasPermission) return;
 
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [4, 3],
-            quality: 0.8,
-        });
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                allowsEditing: false,
+                quality: 0.8,
+            });
 
-        if (!result.canceled) {
-            setImageUri(result.assets[0].uri);
+            if (!result.canceled) {
+                const uri = result.assets[0].uri;
+                setImageUri(uri);
+                runInference(uri);
+            }
+        } catch (error) {
+            console.error('Error opening gallery:', error);
+            Alert.alert('Gallery Error', 'Unable to open gallery. Please try again.');
         }
     };
 
@@ -63,7 +106,18 @@ const CaptureScreen = ({ navigation }) => {
             Alert.alert('No Image', 'Please capture or select an image first');
             return;
         }
-        navigation.navigate('Form', { imageUri });
+
+        if (isAnalyzing) {
+            Alert.alert('Please Wait', 'Image analysis is in progress.');
+            return;
+        }
+
+        if (!prediction) {
+            Alert.alert('No Prediction', 'Please select another image and try again.');
+            return;
+        }
+
+        navigation.navigate('Form', { imageUri, prediction });
     };
 
     return (
@@ -79,7 +133,10 @@ const CaptureScreen = ({ navigation }) => {
                         <Image source={{ uri: imageUri }} style={styles.image} />
                         <TouchableOpacity
                             style={styles.removeButton}
-                            onPress={() => setImageUri(null)}>
+                            onPress={() => {
+                                setImageUri(null);
+                                setPrediction(null);
+                            }}>
                             <MaterialIcons name="close" size={24} color={colors.white} />
                         </TouchableOpacity>
                     </View>
@@ -111,10 +168,32 @@ const CaptureScreen = ({ navigation }) => {
                 </View>
 
                 {imageUri && (
+                    <View style={styles.analysisContainer}>
+                        <Text style={styles.analysisLabel}>
+                            {isAnalyzing
+                                ? 'Running on-device model...'
+                                : prediction
+                                  ? `Prediction: ${prediction.diseaseName} (${(
+                                        prediction.confidence * 100
+                                    ).toFixed(0)}%)`
+                                  : 'No prediction generated'}
+                        </Text>
+                    </View>
+                )}
+
+                {imageUri && (
                     <TouchableOpacity
-                        style={[commonStyles.button, styles.nextButton]}
+                        style={[
+                            commonStyles.button,
+                            styles.nextButton,
+                            (isAnalyzing || !prediction) && styles.nextButtonDisabled,
+                        ]}
                         onPress={handleNext}>
-                        <Text style={commonStyles.buttonText}>Next: Enter Crop Details</Text>
+                        <Text style={commonStyles.buttonText}>
+                            {isAnalyzing
+                                ? 'Analyzing Image...'
+                                : 'Next: Enter Crop Details'}
+                        </Text>
                     </TouchableOpacity>
                 )}
             </View>
@@ -191,6 +270,22 @@ const styles = StyleSheet.create({
     },
     nextButton: {
         marginTop: 24,
+    },
+    nextButtonDisabled: {
+        opacity: 0.7,
+    },
+    analysisContainer: {
+        marginTop: 16,
+        padding: 12,
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: 8,
+    },
+    analysisLabel: {
+        fontSize: 14,
+        color: colors.textPrimary,
+        fontWeight: '500',
     },
 });
 

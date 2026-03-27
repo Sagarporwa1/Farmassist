@@ -10,27 +10,39 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '../../styles/colors';
 import { commonStyles } from '../../styles/commonStyles';
+import { getDiseaseRecommendation } from '../../config/diseaseRecommendations';
 
 const ResultScreen = ({ route, navigation }) => {
     const { caseData } = route.params;
+    const recommendation = getDiseaseRecommendation(
+        caseData.rawDiseaseLabel || caseData.diseaseName
+    );
 
-    const treatments = [
-        {
-            name: 'Copper Oxychloride 50% WP',
-            description: 'Spray 2-3 times at 10-day intervals',
-            estimatedCost: 450,
-        },
-        {
-            name: 'Mancozeb 75% WP',
-            description: 'Apply as preventive measure',
-            estimatedCost: 350,
-        },
-        {
-            name: 'Carbendazim 12% + Mancozeb 63% WP',
-            description: 'For severe infections',
-            estimatedCost: 550,
-        },
-    ];
+    const treatments = recommendation
+        ? [
+              {
+                  name: 'Recommended Action',
+                  description: `${recommendation.treatment} Urgency: ${recommendation.urgency}`,
+                  estimatedCost: recommendation.cost,
+              },
+          ]
+        : [
+              {
+                  name: 'Copper Oxychloride 50% WP',
+                  description: 'Spray 2-3 times at 10-day intervals',
+                  estimatedCost: 450,
+              },
+              {
+                  name: 'Mancozeb 75% WP',
+                  description: 'Apply as preventive measure',
+                  estimatedCost: 350,
+              },
+              {
+                  name: 'Carbendazim 12% + Mancozeb 63% WP',
+                  description: 'For severe infections',
+                  estimatedCost: 550,
+              },
+          ];
 
     const handleGoHome = () => {
         navigation.navigate('Home');
@@ -90,7 +102,11 @@ const ResultScreen = ({ route, navigation }) => {
                 <View key={index} style={commonStyles.card}>
                     <View style={styles.treatmentHeader}>
                         <Text style={styles.treatmentName}>{treatment.name}</Text>
-                        <Text style={styles.treatmentCost}>₹{treatment.estimatedCost}</Text>
+                        <Text style={styles.treatmentCost}>
+                            {typeof treatment.estimatedCost === 'number'
+                                ? `₹${treatment.estimatedCost}`
+                                : treatment.estimatedCost}
+                        </Text>
                     </View>
                     <Text style={styles.treatmentDescription}>{treatment.description}</Text>
                 </View>

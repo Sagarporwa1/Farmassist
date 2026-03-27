@@ -12,14 +12,16 @@ import { Picker } from '@react-native-picker/picker';
 import { colors } from '../../styles/colors';
 import { commonStyles } from '../../styles/commonStyles';
 import { addCase, initDatabase } from '../../services/db';
+import { predictDiseaseFromImage } from '../../services/diseaseInference';
 
 const FormScreen = ({ route, navigation }) => {
-    const { imageUri } = route.params;
+    const { imageUri, prediction: initialPrediction } = route.params;
     const [cropType, setCropType] = useState('');
     const [landArea, setLandArea] = useState('');
     const [soilType, setSoilType] = useState('');
     const [seedVariety, setSeedVariety] = useState('');
     const [irrigationType, setIrrigationType] = useState('');
+    const [isPredicting, setIsPredicting] = useState(false);
 
     const cropTypes = ['Wheat', 'Rice', 'Cotton', 'Sugarcane', 'Maize', 'Potato', 'Tomato'];
     const soilTypes = ['Alluvial', 'Black', 'Red', 'Laterite', 'Desert', 'Mountain'];
@@ -31,35 +33,35 @@ const FormScreen = ({ route, navigation }) => {
             return;
         }
 
-        // Mock disease detection result
-        const mockDiseases = [
-            { name: 'Leaf Blight', confidence: 0.92 },
-            { name: 'Powdery Mildew', confidence: 0.88 },
-            { name: 'Rust Disease', confidence: 0.85 },
-            { name: 'Bacterial Wilt', confidence: 0.79 },
-        ];
-
-        const detectedDisease = mockDiseases[Math.floor(Math.random() * mockDiseases.length)];
-
-        const caseData = {
-            imageUri,
-            cropType,
-            landArea,
-            soilType,
-            seedVariety,
-            irrigationType,
-            timestamp: new Date().toISOString(),
-            diseaseName: detectedDisease.name,
-            confidence: detectedDisease.confidence,
-        };
+        setIsPredicting(true);
 
         try {
+            const detectedDisease = initialPrediction || (await predictDiseaseFromImage(imageUri));
+
+            const caseData = {
+                imageUri,
+                cropType,
+                landArea,
+                soilType,
+                seedVariety,
+                irrigationType,
+                timestamp: new Date().toISOString(),
+                rawDiseaseLabel: detectedDisease.rawLabel,
+                diseaseName: detectedDisease.diseaseName,
+                confidence: detectedDisease.confidence,
+            };
+
             initDatabase();
             addCase(caseData);
             navigation.navigate('Result', { caseData });
         } catch (error) {
             console.error('Error saving case:', error);
-            Alert.alert('Error', 'Failed to save diagnosis');
+            Alert.alert(
+                'Inference Failed',
+                'Could not run model on this image. Please verify model file setup and try again.'
+            );
+        } finally {
+            setIsPredicting(false);
         }
     };
 
@@ -136,8 +138,13 @@ const FormScreen = ({ route, navigation }) => {
                 items={irrigationTypes}
             />
 
-            <TouchableOpacity style={commonStyles.button} onPress={handleSubmit}>
-                <Text style={commonStyles.buttonText}>Submit for Diagnosis</Text>
+            <TouchableOpacity
+                style={[commonStyles.button, isPredicting && styles.disabledButton]}
+                onPress={handleSubmit}
+                disabled={isPredicting}>
+                <Text style={commonStyles.buttonText}>
+                    {isPredicting ? 'Running On-Device Model...' : 'Submit for Diagnosis'}
+                </Text>
             </TouchableOpacity>
         </ScrollView>
     );
@@ -171,6 +178,9 @@ const styles = StyleSheet.create({
     },
     picker: {
         height: 50,
+    },
+    disabledButton: {
+        opacity: 0.7,
     },
 });
 
