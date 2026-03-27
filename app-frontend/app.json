@@ -11,9 +11,18 @@
   "android": {
     "package": "com.anonymous.kisan"
   },
+  "assetBundlePatterns": [
+    "**/*"
+  ],
+  "plugins": [
+    "react-native-fast-tflite"
+  ],
   "extra": {
     "eas": {
       "projectId": "a2eb0551-a211-4c85-b99d-1e24dd640351"
     }
+  },
+  "ios": {
+    "bundleIdentifier": "com.anonymous.kisan"
   }
 }

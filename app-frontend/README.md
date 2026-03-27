@@ -18,7 +18,7 @@ A comprehensive mobile application built with Expo and React Native to assist fa
 ### 🔬 Disease Detection
 - Capture crop images using camera or gallery
 - Detailed crop information form
-- AI-powered disease diagnosis (mock implementation)
+- AI-powered on-device disease diagnosis (TensorFlow Lite)
 - Treatment recommendations with estimated costs
 - Confidence score visualization
 
@@ -51,6 +51,24 @@ A comprehensive mobile application built with Expo and React Native to assist fa
 - **Database**: Expo SQLite
 - **Image Picker**: Expo Image Picker
 - **Icons**: @expo/vector-icons (MaterialIcons)
+- **On-device ML**: TensorFlow Lite (`react-native-fast-tflite`)
+
+## TensorFlow Lite Model Setup
+
+1. Put your trained model file in:
+   - `assets/model.tflite`
+   - `assets/labels.json`
+2. Ensure label index order in `assets/labels.json` matches your model output indices.
+3. Optional: customize treatment mapping in `src/config/diseaseRecommendations.js`.
+4. Install dependencies:
+   ```bash
+   npm install
+   ```
+5. Build a native dev app (Expo Go is not supported for TFLite):
+   ```bash
+   npx expo prebuild --clean
+   npx expo run:android
+   ```
 
 ## Installation
 
@@ -128,14 +146,12 @@ Splash → Onboarding → Login → MainApp (Tabs)
 ```
 
 ### Mock Data
-- Disease detection uses simulated AI results
 - Market prices are sample data
 - Price predictions are mock forecasts
 - Can be replaced with real API integration
 
 ## Future Enhancements
 
-- [ ] Integrate real ML model for disease detection
 - [ ] Connect to live mandi price APIs
 - [ ] Add user profile and settings screens
 - [ ] Implement real OTP authentication
